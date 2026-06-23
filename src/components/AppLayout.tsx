@@ -10,12 +10,14 @@ import {
   CloudOff,
   FileBarChart,
   LayoutDashboard,
+  LockKeyhole,
   LogOut,
   Menu,
   PackagePlus,
   ReceiptText,
   RefreshCw,
   Settings,
+  ShieldCheck,
   ShoppingCart,
   WalletCards,
   X
@@ -25,7 +27,7 @@ import { NavLink } from 'react-router-dom'
 import { cn } from '../lib/format'
 import { useAppStore } from '../store/AppStore'
 import type { Role } from '../types'
-import { Badge } from './ui'
+import { Badge, Button, Field, Input, Modal } from './ui'
 
 const navGroups = [
   {
@@ -113,10 +115,53 @@ function Sidebar({
 }
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { user, signOut, syncState, pendingJobs, syncNow, demoMode } = useAppStore()
+  const { user, signOut, changePassword, syncState, pendingJobs, syncNow, demoMode } = useAppStore()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' })
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState<{ tone: 'success' | 'danger' | 'info'; text: string } | null>(null)
   if (!user) return null
+
+  const openPasswordModal = () => {
+    setProfileOpen(false)
+    setPasswordOpen(true)
+    setPasswordMessage(null)
+  }
+
+  const closePasswordModal = () => {
+    if (passwordLoading) return
+    setPasswordOpen(false)
+    setPasswordForm({ password: '', confirm: '' })
+    setPasswordMessage(null)
+  }
+
+  const submitPassword = async () => {
+    setPasswordMessage(null)
+    if (demoMode) {
+      setPasswordMessage({ tone: 'info', text: 'Mode demo tidak menyimpan password. Fitur ini aktif di aplikasi cloud.' })
+      return
+    }
+    if (passwordForm.password.length < 8) {
+      setPasswordMessage({ tone: 'danger', text: 'Password minimal 8 karakter.' })
+      return
+    }
+    if (passwordForm.password !== passwordForm.confirm) {
+      setPasswordMessage({ tone: 'danger', text: 'Konfirmasi password belum sama.' })
+      return
+    }
+    setPasswordLoading(true)
+    try {
+      await changePassword(passwordForm.password)
+      setPasswordForm({ password: '', confirm: '' })
+      setPasswordMessage({ tone: 'success', text: 'Password berhasil diperbarui. Gunakan password baru saat login berikutnya.' })
+    } catch (error) {
+      setPasswordMessage({ tone: 'danger', text: error instanceof Error ? error.message : String(error) })
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
 
   const syncLabels = {
     online: ['Online', 'success'] as const,
@@ -182,6 +227,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     <p className="text-sm font-bold text-slate-900">{user.fullName}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-500">{user.email}</p>
                   </div>
+                  <button onClick={openPasswordModal} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    <LockKeyhole size={17} /> Ganti password
+                  </button>
                   <button onClick={() => void signOut()} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50">
                     <LogOut size={17} /> Keluar
                   </button>
@@ -216,6 +264,51 @@ export function AppLayout({ children }: { children: ReactNode }) {
           ))}
         </nav>
       </div>
+
+      <Modal
+        open={passwordOpen}
+        title="Ganti password"
+        description={`Perbarui password login untuk akun ${user.email}.`}
+        onClose={closePasswordModal}
+        footer={(
+          <>
+            <Button variant="secondary" onClick={closePasswordModal} disabled={passwordLoading}>Batal</Button>
+            <Button onClick={() => void submitPassword()} disabled={passwordLoading}>
+              <ShieldCheck size={16} /> {passwordLoading ? 'Menyimpan...' : 'Simpan password'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-5">
+          <Field label="Password baru" hint="Minimal 8 karakter.">
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={passwordForm.password}
+              onChange={(event) => setPasswordForm({ ...passwordForm, password: event.target.value })}
+            />
+          </Field>
+          <Field label="Ulangi password baru">
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={passwordForm.confirm}
+              onChange={(event) => setPasswordForm({ ...passwordForm, confirm: event.target.value })}
+            />
+          </Field>
+          {passwordMessage && (
+            <div className={`rounded-xl p-3 text-sm font-semibold ${
+              passwordMessage.tone === 'success'
+                ? 'bg-emerald-50 text-emerald-700'
+                : passwordMessage.tone === 'info'
+                  ? 'bg-indigo-50 text-indigo-700'
+                  : 'bg-red-50 text-red-700'
+            }`}>
+              {passwordMessage.text}
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   )
 }

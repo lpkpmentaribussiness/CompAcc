@@ -1,5 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertOctagon, Building2, LockKeyhole, Plus, RefreshCw, ShieldCheck, Trash2, UserRoundPlus, Users } from 'lucide-react'
+import { AlertOctagon, Building2, Plus, RefreshCw, Trash2, UserRoundPlus, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { DataTable } from '../components/DataTable'
 import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select } from '../components/ui'
@@ -16,15 +16,12 @@ interface Member {
 }
 
 export default function SettingsPage() {
-  const { user, snapshot, saveParty, pendingJobs, retryConflict, discardConflict, changePassword, demoMode } = useAppStore()
+  const { user, snapshot, saveParty, pendingJobs, retryConflict, discardConflict } = useAppStore()
   const [partyOpen, setPartyOpen] = useState(false)
   const [party, setParty] = useState({ name: '', type: 'customer' as Party['type'], phone: '', email: '', address: '' })
   const [inviteOpen, setInviteOpen] = useState(false)
   const [invite, setInvite] = useState({ fullName: '', email: '', role: 'cashier' as Member['role'] })
   const [inviting, setInviting] = useState(false)
-  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' })
-  const [passwordLoading, setPasswordLoading] = useState(false)
-  const [passwordMessage, setPasswordMessage] = useState<{ tone: 'success' | 'danger' | 'info'; text: string } | null>(null)
   const [members, setMembers] = useState<Member[]>([
     { id: 'demo-owner', fullName: user?.fullName ?? 'Owner', email: user?.email ?? '', role: 'owner', active: true },
     { id: 'demo-cashier', fullName: 'Totok Sediyantoro', email: 'kasir@compacc.demo', role: 'cashier', active: true }
@@ -106,32 +103,6 @@ export default function SettingsPage() {
     }
   }
 
-  const submitPassword = async () => {
-    setPasswordMessage(null)
-    if (demoMode) {
-      setPasswordMessage({ tone: 'info', text: 'Mode demo tidak menyimpan password. Fitur ini aktif di aplikasi cloud.' })
-      return
-    }
-    if (passwordForm.password.length < 8) {
-      setPasswordMessage({ tone: 'danger', text: 'Password minimal 8 karakter.' })
-      return
-    }
-    if (passwordForm.password !== passwordForm.confirm) {
-      setPasswordMessage({ tone: 'danger', text: 'Konfirmasi password belum sama.' })
-      return
-    }
-    setPasswordLoading(true)
-    try {
-      await changePassword(passwordForm.password)
-      setPasswordForm({ password: '', confirm: '' })
-      setPasswordMessage({ tone: 'success', text: 'Password berhasil diperbarui. Gunakan password baru saat login berikutnya.' })
-    } catch (error) {
-      setPasswordMessage({ tone: 'danger', text: error instanceof Error ? error.message : String(error) })
-    } finally {
-      setPasswordLoading(false)
-    }
-  }
-
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
       <PageHeader
@@ -175,51 +146,6 @@ export default function SettingsPage() {
           </div>
         </Card>
       </div>
-
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 p-5">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-brand-50 p-2.5 text-brand-700"><LockKeyhole size={20} /></div>
-            <div>
-              <h2 className="font-extrabold text-slate-900">Keamanan akun</h2>
-              <p className="mt-1 text-xs text-slate-500">Ganti password login untuk akun {user?.email}.</p>
-            </div>
-          </div>
-          <Badge tone={demoMode ? 'warning' : 'success'}>{demoMode ? 'Demo' : 'Cloud aktif'}</Badge>
-        </div>
-        <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-          <Field label="Password baru" hint="Minimal 8 karakter.">
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={passwordForm.password}
-              onChange={(event) => setPasswordForm({ ...passwordForm, password: event.target.value })}
-            />
-          </Field>
-          <Field label="Ulangi password baru">
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={passwordForm.confirm}
-              onChange={(event) => setPasswordForm({ ...passwordForm, confirm: event.target.value })}
-            />
-          </Field>
-          <Button onClick={() => void submitPassword()} disabled={passwordLoading}>
-            <ShieldCheck size={16} /> {passwordLoading ? 'Menyimpan...' : 'Ubah password'}
-          </Button>
-        </div>
-        {passwordMessage && (
-          <div className={`mx-5 mb-5 rounded-xl p-3 text-sm font-semibold ${
-            passwordMessage.tone === 'success'
-              ? 'bg-emerald-50 text-emerald-700'
-              : passwordMessage.tone === 'info'
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'bg-red-50 text-red-700'
-          }`}>
-            {passwordMessage.text}
-          </div>
-        )}
-      </Card>
 
       <Card className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 p-5">
