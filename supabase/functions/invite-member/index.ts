@@ -21,7 +21,9 @@ Deno.serve(async (request) => {
     if (userError || !userData.user) throw new Error('Sesi tidak valid.')
 
     const { tenantId, email, fullName, role } = await request.json()
-    if (!tenantId || !email || !fullName || !['owner', 'cashier'].includes(role)) throw new Error('Data undangan tidak valid.')
+    const cleanEmail = String(email ?? '').trim().toLowerCase()
+    const cleanFullName = String(fullName ?? '').trim()
+    if (!tenantId || !cleanEmail || !cleanFullName || !['owner', 'cashier'].includes(role)) throw new Error('Data undangan tidak valid.')
 
     const { data: membership, error: membershipError } = await adminClient
       .from('memberships')
@@ -33,19 +35,22 @@ Deno.serve(async (request) => {
       .single()
     if (membershipError || !membership) throw new Error('Hanya Owner yang dapat mengundang pengguna.')
 
-    const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: fullName, tenant_id: tenantId, role }
+    const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(cleanEmail, {
+      data: { full_name: cleanFullName, tenant_id: tenantId, role }
     })
     if (inviteError) throw inviteError
 
     const { data: created, error: createError } = await adminClient
       .from('memberships')
-      .insert({
+      .upsert({
         tenant_id: tenantId,
         user_id: invited.user.id,
-        full_name: fullName,
+        full_name: cleanFullName,
+        email: cleanEmail,
         role,
         active: true
+      }, {
+        onConflict: 'tenant_id,email'
       })
       .select('id')
       .single()

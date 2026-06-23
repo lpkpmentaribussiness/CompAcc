@@ -31,7 +31,7 @@ export default function SettingsPage() {
     if (!supabase || !user) return
     supabase
       .from('memberships')
-      .select('id,full_name,role,active,user_id')
+      .select('id,full_name,email,role,active')
       .eq('tenant_id', user.tenantId)
       .order('created_at')
       .then(({ data }) => {
@@ -39,7 +39,7 @@ export default function SettingsPage() {
         setMembers(data.map((item) => ({
           id: item.id,
           fullName: item.full_name,
-          email: item.user_id === user.id ? user.email : 'Akun terundang',
+          email: item.email,
           role: item.role,
           active: item.active
         })))

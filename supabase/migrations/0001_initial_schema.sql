@@ -20,10 +20,12 @@ create table public.memberships (
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   full_name text not null,
+  email text not null check (email = lower(trim(email)) and email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   role text not null check (role in ('owner', 'cashier')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
-  unique (tenant_id, user_id)
+  unique (tenant_id, user_id),
+  unique (tenant_id, email)
 );
 
 create table public.parties (

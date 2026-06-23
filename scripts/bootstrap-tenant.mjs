@@ -44,6 +44,7 @@ const { error: membershipError } = await supabase.from('memberships').insert({
   tenant_id: tenant.id,
   user_id: userResult.user.id,
   full_name: ownerName,
+  email: email.trim().toLowerCase(),
   role: 'owner'
 })
 if (membershipError) throw membershipError
