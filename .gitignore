@@ -1,0 +1,12 @@
+node_modules
+dist
+aaaaaadist
+.env
+.env.local
+.vercel
+.DS_Store
+*.log
+.vite
+coverage
+supabase/.branches
+supabase/.temp
