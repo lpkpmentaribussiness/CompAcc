@@ -57,5 +57,10 @@ export const cloudApi = {
   syncOfflineTransaction: (payload: Record<string, unknown>) => rpc('sync_offline_transaction', { p_payload: payload }),
   saveAccount: (draft: AccountDraft) => rpc('save_account', { p_payload: draft }),
   setAccountActive: (accountId: string, active: boolean) =>
-    rpc('set_account_active', { p_account_id: accountId, p_active: active })
+    rpc('set_account_active', { p_account_id: accountId, p_active: active }),
+  deleteAccount: (accountId: string, targetAccountId?: string) =>
+    rpc('delete_account', {
+      p_account_id: accountId,
+      p_target_account_id: targetAccountId ?? null
+    })
 }

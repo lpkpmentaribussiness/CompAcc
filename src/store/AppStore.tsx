@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { demoSnapshot, demoUser } from '../data/demo'
 import { calculateMetrics, journalIsBalanced } from '../lib/accounting'
-import { normalBalanceForCategory, validateAccountInput } from '../lib/accounts'
+import { deleteOrMergeAccount, normalBalanceForCategory, validateAccountInput } from '../lib/accounts'
 import { makeId, today } from '../lib/format'
 import { offlineStore } from '../lib/offline'
 import { cloudApi, cloudEnabled, supabase } from '../lib/supabase'
@@ -42,6 +42,7 @@ interface AppStoreValue {
   saveParty: (party: Partial<Party> & Pick<Party, 'name' | 'type'>) => Promise<void>
   saveAccount: (draft: AccountDraft) => Promise<void>
   setAccountActive: (accountId: string, active: boolean) => Promise<void>
+  deleteAccount: (accountId: string, targetAccountId?: string) => Promise<void>
   syncNow: () => Promise<void>
   retryConflict: (conflictId: string) => Promise<void>
   discardConflict: (conflictId: string) => Promise<void>
@@ -459,6 +460,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [loadCloudSnapshot, snapshot.accounts, user])
 
+  const deleteAccount = useCallback(async (accountId: string, targetAccountId?: string) => {
+    if (!user || user.role !== 'owner') throw new Error('Hanya Owner yang dapat menghapus akun.')
+    const account = snapshot.accounts.find((item) => item.id === accountId)
+    if (!account) throw new Error('Akun tidak ditemukan.')
+    if (account.systemKey) throw new Error('Akun sistem tidak dapat dihapus.')
+    if (supabase) {
+      await cloudApi.deleteAccount(accountId, targetAccountId)
+      await loadCloudSnapshot(user)
+      return
+    }
+    setSnapshot((current) => deleteOrMergeAccount(current, accountId, targetAccountId))
+  }, [loadCloudSnapshot, snapshot.accounts, user])
+
   const syncNow = useCallback(async () => {
     if (!navigator.onLine || !user) {
       setSyncState('offline')
@@ -541,11 +555,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppStoreValue>(() => ({
     user, snapshot, metrics, syncState, pendingJobs, loading, demoMode: !cloudEnabled,
     signIn, signOut, changePassword, postTransaction, settleInvoice, postManualJournal, voidTransaction,
-    saveProduct, saveParty, saveAccount, setAccountActive, syncNow, retryConflict, discardConflict
+    saveProduct, saveParty, saveAccount, setAccountActive, deleteAccount, syncNow, retryConflict, discardConflict
   }), [
     user, snapshot, metrics, syncState, pendingJobs, loading, signIn, signOut, changePassword, postTransaction,
     settleInvoice, postManualJournal, voidTransaction, saveProduct, saveParty, saveAccount,
-    setAccountActive, syncNow,
+    setAccountActive, deleteAccount, syncNow,
     retryConflict, discardConflict
   ])
 

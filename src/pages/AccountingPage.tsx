@@ -1,9 +1,10 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { BookPlus, LockKeyhole, Pencil, Plus, Power, RotateCcw, Scale } from 'lucide-react'
+import { BookPlus, LockKeyhole, Pencil, Plus, Power, RotateCcw, Scale, Trash2 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { DataTable } from '../components/DataTable'
 import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select } from '../components/ui'
 import { calculateAccountBalances } from '../lib/accounting'
+import { getAccountUsage } from '../lib/accounts'
 import { formatCurrency, formatDate, today } from '../lib/format'
 import { useAppStore } from '../store/AppStore'
 import type { Account, AccountDraft, JournalEntry, JournalLine, Transaction } from '../types'
@@ -22,12 +23,16 @@ export default function AccountingPage() {
     postManualJournal,
     voidTransaction,
     saveAccount,
-    setAccountActive
+    setAccountActive,
+    deleteAccount
   } = useAppStore()
   const [section, setSection] = useState<'accounts' | 'transactions' | 'journals'>('accounts')
   const [journalOpen, setJournalOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [accountSaving, setAccountSaving] = useState(false)
+  const [accountDeleting, setAccountDeleting] = useState(false)
+  const [mergeAccount, setMergeAccount] = useState<Account | null>(null)
+  const [targetAccountId, setTargetAccountId] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'all' | Account['category']>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [accountForm, setAccountForm] = useState<AccountDraft>({ code: '', name: '', category: 'asset' })
@@ -79,6 +84,44 @@ export default function AccountingPage() {
       window.alert(error instanceof Error ? error.message : String(error))
     }
   }, [setAccountActive])
+
+  const requestDeleteAccount = useCallback(async (account: Account) => {
+    const usage = getAccountUsage(snapshot, account.id)
+    if (usage.journalLines + usage.payments === 0) {
+      if (!window.confirm(`Hapus permanen akun ${account.code} · ${account.name}? Tindakan ini tidak dapat dibatalkan.`)) return
+      setAccountDeleting(true)
+      try {
+        await deleteAccount(account.id)
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : String(error))
+      } finally {
+        setAccountDeleting(false)
+      }
+      return
+    }
+
+    const target = snapshot.accounts.find((candidate) =>
+      candidate.id !== account.id &&
+      candidate.active &&
+      candidate.category === account.category
+    )
+    setMergeAccount(account)
+    setTargetAccountId(target?.id ?? '')
+  }, [deleteAccount, snapshot])
+
+  const submitMergeAccount = async () => {
+    if (!mergeAccount || !targetAccountId) return
+    setAccountDeleting(true)
+    try {
+      await deleteAccount(mergeAccount.id, targetAccountId)
+      setMergeAccount(null)
+      setTargetAccountId('')
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setAccountDeleting(false)
+    }
+  }
 
   const accountColumns = useMemo<ColumnDef<(typeof accountBalances)[number]>[]>(() => [
     {
@@ -134,11 +177,20 @@ export default function AccountingPage() {
             >
               <Power size={15} /> {account.active ? 'Nonaktifkan' : 'Aktifkan'}
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-600"
+              disabled={accountDeleting}
+              onClick={() => void requestDeleteAccount(account)}
+            >
+              <Trash2 size={15} /> Hapus
+            </Button>
           </div>
         )
       }
     }
-  ], [openAccount, toggleAccount])
+  ], [accountDeleting, openAccount, requestDeleteAccount, toggleAccount])
 
   const transactionColumns = useMemo<ColumnDef<Transaction>[]>(() => [
     {
@@ -376,6 +428,75 @@ export default function AccountingPage() {
             <Badge tone={balanced ? 'success' : 'danger'}>{balanced ? 'Seimbang' : 'Belum seimbang'}</Badge>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(mergeAccount)}
+        title="Gabungkan dan hapus akun"
+        description="Akun ini sudah memiliki riwayat dan harus dialihkan sebelum dihapus."
+        onClose={() => {
+          if (accountDeleting) return
+          setMergeAccount(null)
+          setTargetAccountId('')
+        }}
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              disabled={accountDeleting}
+              onClick={() => {
+                setMergeAccount(null)
+                setTargetAccountId('')
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              disabled={accountDeleting || !targetAccountId}
+              onClick={() => void submitMergeAccount()}
+            >
+              <Trash2 size={16} /> {accountDeleting ? 'Mengalihkan...' : 'Alihkan dan hapus'}
+            </Button>
+          </>
+        )}
+      >
+        {mergeAccount && (
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-red-500">Akun yang akan dihapus</p>
+              <p className="mt-1 font-extrabold text-red-900">{mergeAccount.code} · {mergeAccount.name}</p>
+              <p className="mt-2 text-sm leading-6 text-red-700">
+                Seluruh jurnal dan pembayaran lama akan memakai akun tujuan. Nilai debit, kredit, dan pembayaran tidak berubah.
+              </p>
+            </div>
+            <Field label="Alihkan ke akun">
+              <Select value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)}>
+                <option value="">Pilih akun tujuan</option>
+                {snapshot.accounts
+                  .filter((account) =>
+                    account.id !== mergeAccount.id &&
+                    account.active &&
+                    account.category === mergeAccount.category
+                  )
+                  .map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.code} · {account.name}{account.systemKey ? ' (akun sistem)' : ''}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+            {!snapshot.accounts.some((account) =>
+              account.id !== mergeAccount.id &&
+              account.active &&
+              account.category === mergeAccount.category
+            ) && (
+              <div className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-700">
+                Belum ada akun aktif dengan kategori {categoryLabels[mergeAccount.category]}. Buat atau aktifkan akun tujuan terlebih dahulu.
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   )
