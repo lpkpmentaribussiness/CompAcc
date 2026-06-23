@@ -33,6 +33,7 @@ interface AppStoreValue {
   demoMode: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  changePassword: (newPassword: string) => Promise<void>
   postTransaction: (draft: TransactionDraft) => Promise<Transaction>
   settleInvoice: (transactionId: string, amount: number, note?: string) => Promise<void>
   postManualJournal: (date: string, description: string, lines: JournalLine[]) => Promise<void>
@@ -525,6 +526,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const changePassword = useCallback(async (newPassword: string) => {
+    if (!supabase) throw new Error('Ubah password hanya tersedia saat aplikasi tersambung ke Supabase.')
+    if (newPassword.length < 8) throw new Error('Password minimal 8 karakter.')
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) throw error
+  }, [])
+
   const metrics = useMemo(
     () => calculateMetrics(snapshot.accounts, snapshot.journals, snapshot.transactions),
     [snapshot.accounts, snapshot.journals, snapshot.transactions]
@@ -532,10 +540,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppStoreValue>(() => ({
     user, snapshot, metrics, syncState, pendingJobs, loading, demoMode: !cloudEnabled,
-    signIn, signOut, postTransaction, settleInvoice, postManualJournal, voidTransaction,
+    signIn, signOut, changePassword, postTransaction, settleInvoice, postManualJournal, voidTransaction,
     saveProduct, saveParty, saveAccount, setAccountActive, syncNow, retryConflict, discardConflict
   }), [
-    user, snapshot, metrics, syncState, pendingJobs, loading, signIn, signOut, postTransaction,
+    user, snapshot, metrics, syncState, pendingJobs, loading, signIn, signOut, changePassword, postTransaction,
     settleInvoice, postManualJournal, voidTransaction, saveProduct, saveParty, saveAccount,
     setAccountActive, syncNow,
     retryConflict, discardConflict
