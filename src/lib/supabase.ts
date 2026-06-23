@@ -6,12 +6,38 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
 export const cloudEnabled = Boolean(url && anonKey)
 
+const headerSafeValue = (value: string) => value.replace(/[^\x20-\x7E]/g, '').trim()
+
+const cleanHeaders = (headers?: HeadersInit): HeadersInit | undefined => {
+  if (!headers) return undefined
+
+  if (headers instanceof Headers) {
+    const clean = new Headers()
+    headers.forEach((value, key) => clean.set(key, headerSafeValue(value)))
+    return clean
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.map(([key, value]) => [key, headerSafeValue(String(value))])
+  }
+
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [key, headerSafeValue(String(value))])
+  )
+}
+
+const headerSafeFetch: typeof fetch = (input, init) =>
+  fetch(input, init ? { ...init, headers: cleanHeaders(init.headers) } : init)
+
 export const supabase = cloudEnabled
-  ? createClient(url!, anonKey!, {
+  ? createClient(headerSafeValue(url!), headerSafeValue(anonKey!), {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true
+      },
+      global: {
+        fetch: headerSafeFetch
       }
     })
   : null
