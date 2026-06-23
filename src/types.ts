@@ -11,6 +11,20 @@ export interface UserProfile {
   role: Role
   tenantId: string
   tenantName: string
+  tenantActive: boolean
+  isPlatformCreator: boolean
+}
+
+export interface PlatformCompany {
+  id: string
+  name: string
+  email?: string
+  active: boolean
+  createdAt: string
+  ownerName: string
+  ownerEmail: string
+  ownerActive: boolean
+  cashierCount: number
 }
 
 export interface Product {

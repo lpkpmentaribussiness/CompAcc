@@ -8,6 +8,7 @@ import {
   CircleDollarSign,
   Cloud,
   CloudOff,
+  Crown,
   FileBarChart,
   LayoutDashboard,
   LockKeyhole,
@@ -227,6 +228,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     <p className="text-sm font-bold text-slate-900">{user.fullName}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-500">{user.email}</p>
                   </div>
+                  {user.isPlatformCreator && (
+                    <NavLink
+                      to="/platform"
+                      onClick={() => setProfileOpen(false)}
+                      className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+                    >
+                      <Crown size={17} /> Panel Creator
+                    </NavLink>
+                  )}
                   <button onClick={openPasswordModal} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     <LockKeyhole size={17} /> Ganti password
                   </button>

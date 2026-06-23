@@ -1,9 +1,9 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertOctagon, Building2, Plus, RefreshCw, Trash2, UserRoundPlus, Users } from 'lucide-react'
+import { AlertOctagon, Building2, Plus, Power, RefreshCw, Trash2, UserRoundPlus, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { DataTable } from '../components/DataTable'
 import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select } from '../components/ui'
-import { cloudEnabled, supabase } from '../lib/supabase'
+import { cloudApi, cloudEnabled, supabase } from '../lib/supabase'
 import { useAppStore } from '../store/AppStore'
 import type { Party } from '../types'
 
@@ -20,7 +20,7 @@ export default function SettingsPage() {
   const [partyOpen, setPartyOpen] = useState(false)
   const [party, setParty] = useState({ name: '', type: 'customer' as Party['type'], phone: '', email: '', address: '' })
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [invite, setInvite] = useState({ fullName: '', email: '', role: 'cashier' as Member['role'] })
+  const [invite, setInvite] = useState({ fullName: '', email: '' })
   const [inviting, setInviting] = useState(false)
   const [members, setMembers] = useState<Member[]>([
     { id: 'demo-owner', fullName: user?.fullName ?? 'Owner', email: user?.email ?? '', role: 'owner', active: true },
@@ -74,7 +74,6 @@ export default function SettingsPage() {
             tenantId: user?.tenantId,
             email: invite.email.trim().toLowerCase(),
             fullName: invite.fullName.trim(),
-            role: invite.role
           }
         })
         if (error) throw error
@@ -82,7 +81,7 @@ export default function SettingsPage() {
           id: data.membershipId,
           fullName: invite.fullName.trim(),
           email: invite.email.trim().toLowerCase(),
-          role: invite.role,
+          role: 'cashier',
           active: true
         }])
       } else {
@@ -90,16 +89,28 @@ export default function SettingsPage() {
           id: crypto.randomUUID(),
           fullName: invite.fullName.trim(),
           email: invite.email.trim().toLowerCase(),
-          role: invite.role,
+          role: 'cashier',
           active: true
         }])
       }
       setInviteOpen(false)
-      setInvite({ fullName: '', email: '', role: 'cashier' })
+      setInvite({ fullName: '', email: '' })
     } catch (error) {
       window.alert(error instanceof Error ? error.message : String(error))
     } finally {
       setInviting(false)
+    }
+  }
+
+  const toggleCashier = async (member: Member) => {
+    if (member.role !== 'cashier') return
+    try {
+      if (supabase) await cloudApi.setCashierActive(member.id, !member.active)
+      setMembers((current) => current.map((item) =>
+        item.id === member.id ? { ...item, active: !item.active } : item
+      ))
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -129,9 +140,9 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between border-b border-slate-100 p-5">
             <div className="flex items-center gap-3">
               <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Users size={20} /></div>
-              <div><h2 className="font-extrabold text-slate-900">Pengguna usaha</h2><p className="mt-1 text-xs text-slate-500">Owner dan Kasir aktif.</p></div>
+              <div><h2 className="font-extrabold text-slate-900">Pengguna usaha</h2><p className="mt-1 text-xs text-slate-500">Owner mengelola akun Kasir perusahaan.</p></div>
             </div>
-            <Button size="sm" onClick={() => setInviteOpen(true)}><UserRoundPlus size={16} /> Undang pengguna</Button>
+            <Button size="sm" onClick={() => setInviteOpen(true)}><UserRoundPlus size={16} /> Undang Kasir</Button>
           </div>
           <div className="divide-y divide-slate-100">
             {members.map((member) => (
@@ -141,6 +152,16 @@ export default function SettingsPage() {
                 </div>
                 <div className="min-w-0 flex-1"><p className="font-bold text-slate-800">{member.fullName}</p><p className="truncate text-xs text-slate-400">{member.email}</p></div>
                 <Badge tone={member.role === 'owner' ? 'info' : 'warning'}>{member.role === 'owner' ? 'Owner' : 'Kasir'}</Badge>
+                {member.role === 'cashier' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={member.active ? 'text-red-600' : 'text-emerald-600'}
+                    onClick={() => void toggleCashier(member)}
+                  >
+                    <Power size={15} /> {member.active ? 'Nonaktifkan' : 'Aktifkan'}
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -217,20 +238,14 @@ export default function SettingsPage() {
 
       <Modal
         open={inviteOpen}
-        title="Undang pengguna"
-        description={cloudEnabled ? 'Supabase akan mengirim email undangan untuk membuat password.' : 'Mode demo tidak mengirim email sungguhan.'}
+        title="Undang Kasir"
+        description={cloudEnabled ? 'Supabase akan mengirim email agar Kasir membuat password sendiri.' : 'Mode demo tidak mengirim email sungguhan.'}
         onClose={() => setInviteOpen(false)}
         footer={<><Button variant="secondary" onClick={() => setInviteOpen(false)}>Batal</Button><Button onClick={() => void submitInvite()} disabled={inviting}>{inviting ? 'Mengirim...' : 'Kirim undangan'}</Button></>}
       >
         <div className="space-y-4">
           <Field label="Nama lengkap"><Input value={invite.fullName} onChange={(event) => setInvite({ ...invite, fullName: event.target.value })} /></Field>
           <Field label="Email"><Input type="email" value={invite.email} onChange={(event) => setInvite({ ...invite, email: event.target.value })} /></Field>
-          <Field label="Role">
-            <Select value={invite.role} onChange={(event) => setInvite({ ...invite, role: event.target.value as Member['role'] })}>
-              <option value="cashier">Kasir</option>
-              <option value="owner">Owner</option>
-            </Select>
-          </Field>
         </div>
       </Modal>
     </div>

@@ -8,7 +8,9 @@ export const demoUser: UserProfile = {
   fullName: 'Sofian Mentari',
   role: 'owner',
   tenantId,
-  tenantName: 'Kedai Senandika'
+  tenantName: 'Kedai Senandika',
+  tenantActive: true,
+  isPlatformCreator: true
 }
 
 export const demoAccounts: Account[] = [

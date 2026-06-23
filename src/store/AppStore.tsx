@@ -164,23 +164,29 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setLoading(false)
         return
       }
-      const { data: membership, error } = await client
-        .from('memberships')
-        .select('tenant_id,role,full_name,tenants(name)')
-        .eq('user_id', data.session.user.id)
-        .eq('active', true)
-        .single()
-      if (error) throw error
-      const tenant = membership.tenants as unknown as { name: string }
+      const { data: profiles, error } = await client.rpc('get_current_profile')
+      const profile = profiles?.[0]
+      if (error || !profile) {
+        await client.auth.signOut()
+        setUser(null)
+        setLoading(false)
+        return
+      }
       const activeUser: UserProfile = {
         id: data.session.user.id,
         email: data.session.user.email ?? '',
-        fullName: membership.full_name,
-        role: membership.role,
-        tenantId: membership.tenant_id,
-        tenantName: tenant.name
+        fullName: profile.full_name,
+        role: profile.role,
+        tenantId: profile.tenant_id,
+        tenantName: profile.tenant_name,
+        tenantActive: Boolean(profile.tenant_active),
+        isPlatformCreator: Boolean(profile.is_platform_creator)
       }
       setUser(activeUser)
+      if (!activeUser.tenantActive) {
+        setLoading(false)
+        return
+      }
       try {
         await loadCloudSnapshot(activeUser)
       } catch {

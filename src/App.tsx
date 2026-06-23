@@ -11,6 +11,7 @@ const CommercePage = lazy(() => import('./pages/CommercePage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const InvoicesPage = lazy(() => import('./pages/InvoicesPage'))
 const ProductsPage = lazy(() => import('./pages/ProductsPage'))
+const PlatformPage = lazy(() => import('./pages/PlatformPage'))
 const ReportsPage = lazy(() => import('./pages/ReportsPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
@@ -19,7 +20,7 @@ function PageLoader() {
 }
 
 export default function App() {
-  const { user, loading } = useAppStore()
+  const { user, loading, signOut } = useAppStore()
   if (loading) {
     return (
       <div className="grid min-h-screen place-items-center bg-slate-950 text-white">
@@ -28,6 +29,18 @@ export default function App() {
     )
   }
   if (!user) return <LoginPage />
+  if (!user.tenantActive) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-slate-950 p-6 text-white">
+        <div className="max-w-md text-center">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-red-500/15 text-2xl">!</div>
+          <h1 className="mt-5 text-2xl font-extrabold">Akses perusahaan dinonaktifkan</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-400">Hubungi pengelola CompAcc untuk mengaktifkan kembali workspace {user.tenantName}.</p>
+          <button className="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-slate-950" onClick={() => void signOut()}>Keluar</button>
+        </div>
+      </div>
+    )
+  }
   const owner = user.role === 'owner'
   return (
     <AppLayout>
@@ -43,6 +56,7 @@ export default function App() {
           <Route path="/akuntansi" element={owner ? <AccountingPage /> : <Navigate to="/" replace />} />
           <Route path="/laporan" element={owner ? <ReportsPage /> : <Navigate to="/" replace />} />
           <Route path="/pengaturan" element={owner ? <SettingsPage /> : <Navigate to="/" replace />} />
+          <Route path="/platform" element={user.isPlatformCreator ? <PlatformPage /> : <Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

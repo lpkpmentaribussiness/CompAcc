@@ -20,10 +20,10 @@ Deno.serve(async (request) => {
     const { data: userData, error: userError } = await callerClient.auth.getUser()
     if (userError || !userData.user) throw new Error('Sesi tidak valid.')
 
-    const { tenantId, email, fullName, role } = await request.json()
+    const { tenantId, email, fullName } = await request.json()
     const cleanEmail = String(email ?? '').trim().toLowerCase()
     const cleanFullName = String(fullName ?? '').trim()
-    if (!tenantId || !cleanEmail || !cleanFullName || !['owner', 'cashier'].includes(role)) throw new Error('Data undangan tidak valid.')
+    if (!tenantId || !cleanEmail || !cleanFullName) throw new Error('Data undangan tidak valid.')
 
     const { data: membership, error: membershipError } = await adminClient
       .from('memberships')
@@ -35,8 +35,16 @@ Deno.serve(async (request) => {
       .single()
     if (membershipError || !membership) throw new Error('Hanya Owner yang dapat mengundang pengguna.')
 
+    const { data: existingMembership } = await adminClient
+      .from('memberships')
+      .select('id')
+      .eq('email', cleanEmail)
+      .maybeSingle()
+    if (existingMembership) throw new Error('Email sudah terhubung ke perusahaan lain.')
+
     const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(cleanEmail, {
-      data: { full_name: cleanFullName, tenant_id: tenantId, role }
+      data: { full_name: cleanFullName, tenant_id: tenantId, role: 'cashier' },
+      redirectTo: 'https://comp-acc.vercel.app'
     })
     if (inviteError) throw inviteError
 
@@ -47,7 +55,7 @@ Deno.serve(async (request) => {
         user_id: invited.user.id,
         full_name: cleanFullName,
         email: cleanEmail,
-        role,
+        role: 'cashier',
         active: true
       }, {
         onConflict: 'tenant_id,email'

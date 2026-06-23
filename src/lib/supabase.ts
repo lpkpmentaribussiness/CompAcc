@@ -62,5 +62,9 @@ export const cloudApi = {
     rpc('delete_account', {
       p_account_id: accountId,
       p_target_account_id: targetAccountId ?? null
-    })
+    }),
+  setCompanyActive: (tenantId: string, active: boolean) =>
+    rpc('set_company_active', { p_tenant_id: tenantId, p_active: active }),
+  setCashierActive: (membershipId: string, active: boolean) =>
+    rpc('set_cashier_active', { p_membership_id: membershipId, p_active: active })
 }
